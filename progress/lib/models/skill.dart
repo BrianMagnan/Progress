@@ -3,6 +3,7 @@ class Skill {
   final String categoryId;
   final String name;
   final int? skillLevel; // 1-10 confidence scale
+  final int order;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -11,6 +12,7 @@ class Skill {
     required this.categoryId,
     required this.name,
     this.skillLevel,
+    this.order = 0,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -21,6 +23,7 @@ class Skill {
       'category_id': categoryId,
       'name': name,
       'skill_level': skillLevel,
+      'order': order,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
     };
@@ -32,6 +35,7 @@ class Skill {
       categoryId: map['category_id'] as String,
       name: map['name'] as String,
       skillLevel: map['skill_level'] as int?,
+      order: (map['order'] as int?) ?? 0,
       createdAt: DateTime.parse(map['created_at'] as String),
       updatedAt: DateTime.parse(map['updated_at'] as String),
     );
@@ -42,6 +46,7 @@ class Skill {
     String? categoryId,
     String? name,
     int? skillLevel,
+    int? order,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -50,9 +55,9 @@ class Skill {
       categoryId: categoryId ?? this.categoryId,
       name: name ?? this.name,
       skillLevel: skillLevel ?? this.skillLevel,
+      order: order ?? this.order,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
   }
 }
-

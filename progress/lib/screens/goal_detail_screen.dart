@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import '../models/goal.dart';
 import '../models/progress_log.dart';
-import '../services/database_service.dart';
+import '../models/sub_skill.dart';
+import '../models/skill.dart';
+import '../models/category.dart';
+import '../services/supabase_database_service.dart';
 import '../utils/helpers.dart';
+import '../widgets/breadcrumb_nav.dart';
 
 class GoalDetailScreen extends StatefulWidget {
   final Goal goal;
@@ -14,9 +18,12 @@ class GoalDetailScreen extends StatefulWidget {
 }
 
 class _GoalDetailScreenState extends State<GoalDetailScreen> {
-  final DatabaseService _db = DatabaseService.instance;
+  final SupabaseDatabaseService _db = SupabaseDatabaseService.instance;
   List<ProgressLog> _logs = [];
   ProgressLog? _latestLog;
+  SubSkill? _subSkill;
+  Skill? _skill;
+  Category? _category;
   bool _isLoading = true;
   int _totalSessions = 0;
   int _totalMinutes = 0;
@@ -33,12 +40,24 @@ class _GoalDetailScreenState extends State<GoalDetailScreen> {
     final latest = await _db.getLatestProgressLog(widget.goal.id);
     final sessions = await _db.getTotalProgressLogsCount(widget.goal.id);
     final minutes = await _db.getTotalDurationMinutes(widget.goal.id);
+    final subSkill = await _db.getSubSkill(widget.goal.subSkillId);
+    Skill? skill;
+    Category? category;
+    if (subSkill != null) {
+      skill = await _db.getSkill(subSkill.skillId);
+      if (skill != null) {
+        category = await _db.getCategory(skill.categoryId);
+      }
+    }
 
     setState(() {
       _logs = logs;
       _latestLog = latest;
       _totalSessions = sessions;
       _totalMinutes = minutes;
+      _subSkill = subSkill;
+      _skill = skill;
+      _category = category;
       _isLoading = false;
     });
   }
@@ -254,9 +273,37 @@ class _GoalDetailScreenState extends State<GoalDetailScreen> {
           ),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
+      body: Column(
+        children: [
+          BreadcrumbNav(
+            items: _skill != null && _subSkill != null && _category != null
+                ? [
+                    const BreadcrumbItem(label: 'Home', route: '/'),
+                    const BreadcrumbItem(label: 'Long Term Goals', route: '/long-term-goals'),
+                    BreadcrumbItem(
+                      label: _category!.name,
+                      route: '/long-term-goals/${_category!.id}',
+                    ),
+                    BreadcrumbItem(
+                      label: _skill!.name,
+                      route: '/long-term-goals/${_skill!.categoryId}/skills/${_skill!.id}',
+                    ),
+                    BreadcrumbItem(
+                      label: _subSkill!.name,
+                      route: '/long-term-goals/${_skill!.categoryId}/skills/${_skill!.id}/sub-skills/${_subSkill!.id}',
+                    ),
+                    BreadcrumbItem(label: widget.goal.title),
+                  ]
+                : [
+                    const BreadcrumbItem(label: 'Home', route: '/'),
+                    const BreadcrumbItem(label: 'Long Term Goals', route: '/long-term-goals'),
+                    BreadcrumbItem(label: widget.goal.title),
+                  ],
+          ),
+          Expanded(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : SingleChildScrollView(
               padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -576,6 +623,9 @@ class _GoalDetailScreenState extends State<GoalDetailScreen> {
                 ],
               ),
             ),
+          ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _addProgressLog,
         icon: const Icon(Icons.add),

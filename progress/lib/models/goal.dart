@@ -92,6 +92,7 @@ class Goal {
   final GoalStatus status;
   final GoalDifficulty? difficulty;
   final int? estimatedHours; // Optional estimated time
+  final int order;
   final DateTime createdAt;
   final DateTime updatedAt;
   final DateTime? completedAt;
@@ -104,6 +105,7 @@ class Goal {
     required this.status,
     this.difficulty,
     this.estimatedHours,
+    this.order = 0,
     required this.createdAt,
     required this.updatedAt,
     this.completedAt,
@@ -118,6 +120,7 @@ class Goal {
       'status': status.value,
       'difficulty': difficulty?.value,
       'estimated_hours': estimatedHours,
+      'order': order,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
       'completed_at': completedAt?.toIso8601String(),
@@ -135,6 +138,7 @@ class Goal {
           ? goalDifficultyFromValue(map['difficulty'] as int)
           : null,
       estimatedHours: map['estimated_hours'] as int?,
+      order: (map['order'] as int?) ?? 0,
       createdAt: DateTime.parse(map['created_at'] as String),
       updatedAt: DateTime.parse(map['updated_at'] as String),
       completedAt: map['completed_at'] != null
@@ -151,6 +155,7 @@ class Goal {
     GoalStatus? status,
     GoalDifficulty? difficulty,
     int? estimatedHours,
+    int? order,
     DateTime? createdAt,
     DateTime? updatedAt,
     DateTime? completedAt,
@@ -163,6 +168,7 @@ class Goal {
       status: status ?? this.status,
       difficulty: difficulty ?? this.difficulty,
       estimatedHours: estimatedHours ?? this.estimatedHours,
+      order: order ?? this.order,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       completedAt: completedAt ?? this.completedAt,

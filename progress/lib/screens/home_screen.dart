@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../models/progress_log.dart';
 import '../models/goal.dart';
-import '../services/database_service.dart';
+import '../services/supabase_database_service.dart';
 import '../utils/helpers.dart';
-import 'categories_screen.dart';
 import 'goal_detail_screen.dart';
+import 'global_search_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -14,8 +15,9 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  final DatabaseService _db = DatabaseService.instance;
+  final SupabaseDatabaseService _db = SupabaseDatabaseService.instance;
   List<ProgressLog> _recentActivity = [];
+  List<Goal> _goals = [];
   bool _isLoading = true;
 
   @override
@@ -26,15 +28,25 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _loadRecentActivity() async {
     setState(() => _isLoading = true);
-    final activity = await _db.getRecentActivity(limit: 5);
+    final activity = await _db.getRecentActivity(limit: 50);
+    // Load all goals for these activity items
+    final goalIds = activity.map((log) => log.goalId).toSet();
+    final goals = <Goal>[];
+    for (final goalId in goalIds) {
+      final goal = await _db.getGoal(goalId);
+      if (goal != null) {
+        goals.add(goal);
+      }
+    }
     setState(() {
       _recentActivity = activity;
+      _goals = goals;
       _isLoading = false;
     });
   }
 
-  Future<Goal?> _getGoalForLog(ProgressLog log) async {
-    return await _db.getGoal(log.goalId);
+  List<ProgressLog> get _recentActivityList {
+    return _recentActivity.take(5).toList();
   }
 
   @override
@@ -44,15 +56,18 @@ class _HomeScreenState extends State<HomeScreen> {
         title: const Text('Progress'),
         actions: [
           IconButton(
+            icon: const Icon(Icons.search_rounded),
+            onPressed: () {
+              GlobalSearchScreen.show(context);
+            },
+            tooltip: 'Search all goals and tasks',
+          ),
+          IconButton(
             icon: const Icon(Icons.folder),
             onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const CategoriesScreen(),
-                ),
-              ).then((_) => _loadRecentActivity());
+              context.push('/long-term-goals').then((_) => _loadRecentActivity());
             },
+            tooltip: 'Long Term Goals',
           ),
         ],
       ),
@@ -93,57 +108,19 @@ class _HomeScreenState extends State<HomeScreen> {
                     _buildActionCard(
                       context,
                       icon: Icons.folder,
-                      title: 'Categories',
+                      title: 'Long Term Goals',
                       color: Theme.of(context).colorScheme.primary,
                       onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const CategoriesScreen(),
-                          ),
-                        ).then((_) => _loadRecentActivity());
-                      },
-                    ),
-                    _buildActionCard(
-                      context,
-                      icon: Icons.analytics_outlined,
-                      title: 'Analytics',
-                      color: Theme.of(context).colorScheme.secondary,
-                      onTap: () {
-                        // Analytics feature coming soon
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Analytics coming soon!'),
-                          ),
-                        );
-                      },
-                    ),
-                    _buildActionCard(
-                      context,
-                      icon: Icons.history,
-                      title: 'All Activity',
-                      color: Theme.of(context).colorScheme.tertiary,
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const CategoriesScreen(),
-                          ),
-                        );
+                        context.push('/long-term-goals').then((_) => _loadRecentActivity());
                       },
                     ),
                     _buildActionCard(
                       context,
                       icon: Icons.flag,
-                      title: 'My Goals',
-                      color: Theme.of(context).colorScheme.error,
+                      title: 'Short Term Goals',
+                      color: Theme.of(context).colorScheme.secondary,
                       onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const CategoriesScreen(),
-                          ),
-                        );
+                        context.push('/short-term-goals').then((_) => _loadRecentActivity());
                       },
                     ),
                   ],
@@ -164,12 +141,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     if (_recentActivity.isNotEmpty)
                       TextButton(
                         onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const CategoriesScreen(),
-                            ),
-                          );
+                          context.push('/long-term-goals');
                         },
                         child: const Text('View All'),
                       ),
@@ -218,13 +190,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             const SizedBox(height: 16),
                             FilledButton.icon(
                               onPressed: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) =>
-                                        const CategoriesScreen(),
-                                  ),
-                                );
+                                context.push('/long-term-goals');
                               },
                               icon: const Icon(Icons.add),
                               label: const Text('Get Started'),
@@ -235,101 +201,89 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   )
                 else
-                  ..._recentActivity.map(
-                    (log) => FutureBuilder<Goal?>(
-                      future: _getGoalForLog(log),
-                      builder: (context, snapshot) {
-                        if (!snapshot.hasData) {
-                          return const SizedBox.shrink();
-                        }
-                        final goal = snapshot.data!;
-                        return Card(
-                          margin: const EdgeInsets.only(bottom: 12),
-                          child: ListTile(
-                            contentPadding: const EdgeInsets.all(16),
-                            leading: CircleAvatar(
-                              backgroundColor: Theme.of(
-                                context,
-                              ).colorScheme.primaryContainer,
-                              child: Icon(
-                                Icons.check_circle,
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.onPrimaryContainer,
-                              ),
-                            ),
-                            title: Text(
-                              goal.title,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            subtitle: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const SizedBox(height: 4),
-                                Text(
-                                  formatDate(log.date),
-                                  style: Theme.of(context).textTheme.bodySmall
-                                      ?.copyWith(
-                                        color: Theme.of(
-                                          context,
-                                        ).colorScheme.onSurfaceVariant,
-                                      ),
-                                ),
-                                if (log.notes != null) ...[
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    log.notes!,
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: Theme.of(
-                                      context,
-                                    ).textTheme.bodySmall,
-                                  ),
-                                ],
-                                if (log.durationMinutes != null) ...[
-                                  const SizedBox(height: 4),
-                                  Chip(
-                                    label: Text(
-                                      formatDuration(log.durationMinutes!),
-                                    ),
-                                    padding: EdgeInsets.zero,
-                                    materialTapTargetSize:
-                                        MaterialTapTargetSize.shrinkWrap,
-                                  ),
-                                ],
-                              ],
-                            ),
-                            trailing: const Icon(Icons.chevron_right),
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) =>
-                                      GoalDetailScreen(goal: goal),
-                                ),
-                              );
-                            },
+                  ..._recentActivityList.map((log) {
+                    final goal = _goals.firstWhere(
+                      (g) => g.id == log.goalId,
+                      orElse: () => Goal(
+                        id: '',
+                        subSkillId: '',
+                        title: 'Unknown Goal',
+                        status: GoalStatus.notStarted,
+                        createdAt: DateTime.now(),
+                        updatedAt: DateTime.now(),
+                      ),
+                    );
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      child: ListTile(
+                        contentPadding: const EdgeInsets.all(16),
+                        leading: CircleAvatar(
+                          backgroundColor: Theme.of(
+                            context,
+                          ).colorScheme.primaryContainer,
+                          child: Icon(
+                            Icons.check_circle,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onPrimaryContainer,
                           ),
-                        );
-                      },
-                    ),
-                  ),
+                        ),
+                        title: Text(
+                          goal.title,
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const SizedBox(height: 4),
+                            Text(
+                              formatDate(log.date),
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.onSurfaceVariant,
+                                  ),
+                            ),
+                            if (log.notes != null) ...[
+                              const SizedBox(height: 4),
+                              Text(
+                                log.notes!,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
+                            ],
+                            if (log.durationMinutes != null) ...[
+                              const SizedBox(height: 4),
+                              Chip(
+                                label: Text(
+                                  formatDuration(log.durationMinutes!),
+                                ),
+                                padding: EdgeInsets.zero,
+                                materialTapTargetSize:
+                                    MaterialTapTargetSize.shrinkWrap,
+                              ),
+                            ],
+                          ],
+                        ),
+                        trailing: const Icon(Icons.chevron_right),
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) =>
+                                  GoalDetailScreen(goal: goal),
+                            ),
+                          );
+                        },
+                      ),
+                    );
+                  }),
               ],
             ),
           ),
         ),
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const CategoriesScreen()),
-          ).then((_) => _loadRecentActivity());
-        },
-        icon: const Icon(Icons.add),
-        label: const Text('New Category'),
       ),
     );
   }

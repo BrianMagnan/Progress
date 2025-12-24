@@ -1,19 +1,32 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:go_router/go_router.dart';
 import 'theme/app_theme.dart';
-import 'screens/home_screen.dart';
-import 'services/database_service.dart';
+import 'router/app_router.dart';
+import 'services/supabase_database_service.dart';
+import 'services/notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Use path-based URLs for web (instead of hash-based)
+  GoRouter.optionURLReflectsImperativeAPIs = true;
 
-  // Initialize Hive database
+  // Initialize Supabase database
   try {
-    await DatabaseService.instance.init();
+    await SupabaseDatabaseService.instance.init();
   } catch (e, stackTrace) {
     debugPrint('Database initialization failed: $e');
     debugPrint('Stack trace: $stackTrace');
     rethrow;
+  }
+
+  // Initialize local notifications (works on mobile platforms)
+  try {
+    await NotificationService.instance.initialize();
+  } catch (e) {
+    debugPrint('Notification initialization failed: $e');
+    // Continue without notifications if initialization fails
   }
 
   // Set preferred orientations (optional)
@@ -42,29 +55,26 @@ class _ProgressAppState extends State<ProgressApp> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    // Close boxes to ensure data is committed to IndexedDB
-    DatabaseService.instance.closeAll();
+    // Supabase handles persistence automatically
+    SupabaseDatabaseService.instance.closeAll();
     super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.paused ||
-        state == AppLifecycleState.detached) {
-      // Ensure data is saved when app is paused/closed
-      DatabaseService.instance.closeAll();
-    }
+    // Supabase handles persistence automatically
+    // No need to manually save data
   }
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return MaterialApp.router(
       title: 'Progress',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
       themeMode: ThemeMode.system,
-      home: const HomeScreen(),
+      routerConfig: AppRouter.router,
     );
   }
 }

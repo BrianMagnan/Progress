@@ -1,198 +1,51 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import '../models/sub_skill.dart';
+import '../models/short_term_goal.dart';
 import '../models/goal.dart';
-import '../models/skill.dart';
-import '../models/category.dart';
 import '../services/supabase_database_service.dart';
 import '../utils/helpers.dart';
 import 'global_search_screen.dart';
 import '../widgets/breadcrumb_nav.dart';
 
-class GoalsScreen extends StatefulWidget {
-  final SubSkill subSkill;
-
-  const GoalsScreen({super.key, required this.subSkill});
+class ShortTermGoalsScreen extends StatefulWidget {
+  const ShortTermGoalsScreen({super.key});
 
   @override
-  State<GoalsScreen> createState() => _GoalsScreenState();
+  State<ShortTermGoalsScreen> createState() => _ShortTermGoalsScreenState();
 }
 
-class _GoalsScreenState extends State<GoalsScreen> {
+class _ShortTermGoalsScreenState extends State<ShortTermGoalsScreen> {
   final SupabaseDatabaseService _db = SupabaseDatabaseService.instance;
-  List<Goal> _goals = [];
-  Skill? _skill;
-  Category? _category;
+  List<ShortTermGoal> _goals = [];
   bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _loadData();
-  }
-
-  Future<void> _loadData() async {
-    setState(() => _isLoading = true);
-    final goals = await _db.getGoalsBySubSkill(widget.subSkill.id);
-    final skill = await _db.getSkill(widget.subSkill.skillId);
-    Category? category;
-    if (skill != null) {
-      category = await _db.getCategory(skill.categoryId);
-    }
-    setState(() {
-      _goals = goals;
-      _skill = skill;
-      _category = category;
-      _isLoading = false;
-    });
+    _loadGoals();
   }
 
   Future<void> _loadGoals() async {
-    final goals = await _db.getGoalsBySubSkill(widget.subSkill.id);
+    setState(() => _isLoading = true);
+    final goals = await _db.getAllShortTermGoals();
     setState(() {
       _goals = goals;
+      _isLoading = false;
     });
   }
-
 
 
   Future<void> _addGoal() async {
     final titleController = TextEditingController();
     final descriptionController = TextEditingController();
-    final hoursController = TextEditingController();
     GoalDifficulty? selectedDifficulty;
+    DateTime? selectedDueDate;
 
     final result = await showDialog<Map<String, dynamic>>(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          title: const Text('New Goal'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: titleController,
-                  autofocus: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Goal title',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: descriptionController,
-                  maxLines: 3,
-                  decoration: const InputDecoration(
-                    labelText: 'Description (optional)',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                DropdownButtonFormField<GoalDifficulty>(
-                  initialValue: selectedDifficulty,
-                  decoration: const InputDecoration(
-                    labelText: 'Difficulty (optional)',
-                    border: OutlineInputBorder(),
-                  ),
-                  items: GoalDifficulty.values.map((difficulty) {
-                    return DropdownMenuItem(
-                      value: difficulty,
-                      child: Text(difficulty.displayName),
-                    );
-                  }).toList(),
-                  onChanged: (value) {
-                    setDialogState(() {
-                      selectedDifficulty = value;
-                    });
-                  },
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: hoursController,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'Estimated hours (optional)',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () {
-                if (titleController.text.trim().isNotEmpty) {
-                  final hours = hoursController.text.trim().isEmpty
-                      ? null
-                      : int.tryParse(hoursController.text.trim());
-                  Navigator.pop(context, {
-                    'title': titleController.text.trim(),
-                    'description': descriptionController.text.trim().isEmpty
-                        ? null
-                        : descriptionController.text.trim(),
-                    'difficulty': selectedDifficulty,
-                    'hours': hours,
-                  });
-                }
-              },
-              child: const Text('Create'),
-            ),
-          ],
-        ),
-      ),
-    );
-
-    if (result != null) {
-      final now = DateTime.now();
-      // Set order to the end of the list
-      final maxOrder = _goals.isEmpty
-          ? -1
-          : _goals.map((g) => g.order).reduce((a, b) => a > b ? a : b);
-      final goal = Goal(
-        id: generateId(),
-        subSkillId: widget.subSkill.id,
-        title: result['title'],
-        description: result['description'],
-        status: GoalStatus.notStarted,
-        difficulty: result['difficulty'],
-        estimatedHours: result['hours'],
-        order: maxOrder + 1,
-        createdAt: now,
-        updatedAt: now,
-      );
-      try {
-        await _db.createGoal(goal);
-        _loadGoals();
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error saving goal: $e'),
-              backgroundColor: Theme.of(context).colorScheme.error,
-            ),
-          );
-        }
-      }
-    }
-  }
-
-  Future<void> _editGoal(Goal goal) async {
-    final titleController = TextEditingController(text: goal.title);
-    final descriptionController = TextEditingController(
-      text: goal.description ?? '',
-    );
-    GoalDifficulty? selectedDifficulty = goal.difficulty;
-
-    final result = await showDialog<Map<String, dynamic>>(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Edit Goal'),
+          title: const Text('New Short Term Goal'),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -239,6 +92,31 @@ class _GoalsScreenState extends State<GoalsScreen> {
                     });
                   },
                 ),
+                const SizedBox(height: 16),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Due Date (optional)'),
+                  trailing: TextButton(
+                    onPressed: () async {
+                      final date = await showDatePicker(
+                        context: context,
+                        initialDate: selectedDueDate ?? DateTime.now(),
+                        firstDate: DateTime.now(),
+                        lastDate: DateTime.now().add(const Duration(days: 365)),
+                      );
+                      if (date != null) {
+                        setDialogState(() {
+                          selectedDueDate = date;
+                        });
+                      }
+                    },
+                    child: Text(
+                      selectedDueDate == null
+                          ? 'Select date'
+                          : '${selectedDueDate!.year}-${selectedDueDate!.month.toString().padLeft(2, '0')}-${selectedDueDate!.day.toString().padLeft(2, '0')}',
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
@@ -256,6 +134,152 @@ class _GoalsScreenState extends State<GoalsScreen> {
                         ? null
                         : descriptionController.text.trim(),
                     'difficulty': selectedDifficulty,
+                    'dueDate': selectedDueDate,
+                  });
+                }
+              },
+              child: const Text('Create'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (result != null) {
+      final now = DateTime.now();
+      // Set order to the end of the list
+      final maxOrder = _goals.isEmpty
+          ? -1
+          : _goals.map((g) => g.order).reduce((a, b) => a > b ? a : b);
+      final goal = ShortTermGoal(
+        id: generateId(),
+        title: result['title'],
+        description: result['description'],
+        status: GoalStatus.inProgress,
+        difficulty: result['difficulty'],
+        dueDate: result['dueDate'],
+        order: maxOrder + 1,
+        createdAt: now,
+        updatedAt: now,
+      );
+      try {
+        await _db.createShortTermGoal(goal);
+        _loadGoals();
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error saving goal: $e'),
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
+          );
+        }
+      }
+    }
+  }
+
+  Future<void> _editGoal(ShortTermGoal goal) async {
+    final titleController = TextEditingController(text: goal.title);
+    final descriptionController = TextEditingController(
+      text: goal.description ?? '',
+    );
+    GoalDifficulty? selectedDifficulty = goal.difficulty;
+    DateTime? selectedDueDate = goal.dueDate;
+
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Edit Short Term Goal'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: titleController,
+                  autofocus: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Goal title',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: descriptionController,
+                  maxLines: 3,
+                  decoration: const InputDecoration(
+                    labelText: 'Description (optional)',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<GoalDifficulty>(
+                  initialValue: selectedDifficulty,
+                  decoration: const InputDecoration(
+                    labelText: 'Difficulty (optional)',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: [
+                    const DropdownMenuItem<GoalDifficulty>(
+                      value: null,
+                      child: Text('None'),
+                    ),
+                    ...GoalDifficulty.values.map((difficulty) {
+                      return DropdownMenuItem(
+                        value: difficulty,
+                        child: Text(difficulty.displayName),
+                      );
+                    }),
+                  ],
+                  onChanged: (value) {
+                    setDialogState(() {
+                      selectedDifficulty = value;
+                    });
+                  },
+                ),
+                const SizedBox(height: 16),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Due Date (optional)'),
+                  trailing: TextButton(
+                    onPressed: () async {
+                      final date = await showDatePicker(
+                        context: context,
+                        initialDate: selectedDueDate ?? DateTime.now(),
+                        firstDate: DateTime.now(),
+                        lastDate: DateTime.now().add(const Duration(days: 365)),
+                      );
+                      if (date != null) {
+                        setDialogState(() {
+                          selectedDueDate = date;
+                        });
+                      }
+                    },
+                    child: Text(
+                      selectedDueDate == null
+                          ? 'Select date'
+                          : '${selectedDueDate!.year}-${selectedDueDate!.month.toString().padLeft(2, '0')}-${selectedDueDate!.day.toString().padLeft(2, '0')}',
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                if (titleController.text.trim().isNotEmpty) {
+                  Navigator.pop(context, {
+                    'title': titleController.text.trim(),
+                    'description': descriptionController.text.trim().isEmpty
+                        ? null
+                        : descriptionController.text.trim(),
+                    'difficulty': selectedDifficulty,
+                    'dueDate': selectedDueDate,
                   });
                 }
               },
@@ -272,10 +296,11 @@ class _GoalsScreenState extends State<GoalsScreen> {
         title: result['title'],
         description: result['description'],
         difficulty: result['difficulty'],
+        dueDate: result['dueDate'],
         updatedAt: now,
       );
       try {
-        await _db.updateGoal(updatedGoal);
+        await _db.updateShortTermGoal(updatedGoal);
         _loadGoals();
       } catch (e) {
         if (mounted) {
@@ -290,12 +315,12 @@ class _GoalsScreenState extends State<GoalsScreen> {
     }
   }
 
-  Future<void> _deleteGoal(Goal goal) async {
+  Future<void> _deleteGoal(ShortTermGoal goal) async {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Delete Goal'),
-        content: Text('Are you sure you want to delete "${goal.title}"? This will also delete all associated progress logs.'),
+        title: const Text('Delete Short Term Goal'),
+        content: Text('Are you sure you want to delete "${goal.title}"?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -314,7 +339,7 @@ class _GoalsScreenState extends State<GoalsScreen> {
 
     if (confirm == true) {
       try {
-        await _db.deleteGoal(goal.id);
+        await _db.deleteShortTermGoal(goal.id);
         _loadGoals();
       } catch (e) {
         if (mounted) {
@@ -348,26 +373,21 @@ class _GoalsScreenState extends State<GoalsScreen> {
     for (int i = startIndex; i <= endIndex; i++) {
       final goal = _goals[i];
       final updatedGoal = goal.copyWith(order: i, updatedAt: now);
-      await _db.updateGoal(updatedGoal);
+      await _db.updateShortTermGoal(updatedGoal);
     }
   }
 
-  Color _getStatusColor(GoalStatus status) {
-    switch (status) {
-      case GoalStatus.notStarted:
-        return Colors.grey;
-      case GoalStatus.inProgress:
-        return Colors.blue;
-      case GoalStatus.completed:
-        return Colors.green;
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.subSkill.name),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => context.go('/'),
+          tooltip: 'Back to home',
+        ),
+        title: const Text('Short Term Goals'),
         actions: [
           IconButton(
             icon: const Icon(Icons.search_rounded),
@@ -386,28 +406,10 @@ class _GoalsScreenState extends State<GoalsScreen> {
       body: Column(
         children: [
           BreadcrumbNav(
-            items: _skill != null && _category != null
-                ? [
-                    const BreadcrumbItem(label: 'Home', route: '/'),
-                    const BreadcrumbItem(label: 'Long Term Goals', route: '/long-term-goals'),
-                    BreadcrumbItem(
-                      label: _category!.name,
-                      route: '/long-term-goals/${_category!.id}',
-                    ),
-                    BreadcrumbItem(
-                      label: _skill!.name,
-                      route: '/long-term-goals/${_skill!.categoryId}/skills/${_skill!.id}',
-                    ),
-                    BreadcrumbItem(
-                      label: widget.subSkill.name,
-                      route: '/long-term-goals/${_skill!.categoryId}/skills/${_skill!.id}/sub-skills/${widget.subSkill.id}',
-                    ),
-                  ]
-                : [
-                    const BreadcrumbItem(label: 'Home', route: '/'),
-                    const BreadcrumbItem(label: 'Long Term Goals', route: '/long-term-goals'),
-                    BreadcrumbItem(label: widget.subSkill.name),
-                  ],
+            items: const [
+              BreadcrumbItem(label: 'Home', route: '/'),
+              BreadcrumbItem(label: 'Short Term Goals'),
+            ],
           ),
           Expanded(
             child: _isLoading
@@ -424,12 +426,12 @@ class _GoalsScreenState extends State<GoalsScreen> {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    'No goals yet',
+                    'No short term goals yet',
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Create your first goal for ${widget.subSkill.name}',
+                    'Create your first short term goal',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
@@ -476,18 +478,12 @@ class _GoalsScreenState extends State<GoalsScreen> {
                               width: 48,
                               height: 48,
                               decoration: BoxDecoration(
-                                color: _getStatusColor(
-                                  goal.status,
-                                ).withValues(alpha: 0.2),
+                                color: Theme.of(context).colorScheme.primaryContainer,
                                 shape: BoxShape.circle,
                               ),
                               child: Icon(
-                                goal.status == GoalStatus.completed
-                                    ? Icons.check_circle
-                                    : goal.status == GoalStatus.inProgress
-                                    ? Icons.play_circle
-                                    : Icons.radio_button_unchecked,
-                                color: _getStatusColor(goal.status),
+                                Icons.task_alt,
+                                color: Theme.of(context).colorScheme.onPrimaryContainer,
                               ),
                             ),
                           ],
@@ -505,24 +501,21 @@ class _GoalsScreenState extends State<GoalsScreen> {
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
                               ),
-                            const SizedBox(height: 4),
-                            Row(
-                              children: [
-                                Chip(
-                                  label: Text(goal.status.displayName),
-                                  backgroundColor: _getStatusColor(
-                                    goal.status,
-                                  ).withValues(alpha: 0.2),
-                                  labelStyle: TextStyle(
-                                    color: _getStatusColor(goal.status),
-                                    fontSize: 12,
-                                  ),
-                                  padding: EdgeInsets.zero,
-                                  materialTapTargetSize:
-                                      MaterialTapTargetSize.shrinkWrap,
+                            if (goal.dueDate != null) ...[
+                              const SizedBox(height: 4),
+                              Text(
+                                'Due: ${goal.dueDate!.year}-${goal.dueDate!.month.toString().padLeft(2, '0')}-${goal.dueDate!.day.toString().padLeft(2, '0')}',
+                                style: TextStyle(
+                                  color: goal.dueDate!.isBefore(DateTime.now())
+                                      ? Theme.of(context).colorScheme.error
+                                      : Theme.of(context).colorScheme.onSurfaceVariant,
                                 ),
-                                if (goal.difficulty != null) ...[
-                                  const SizedBox(width: 8),
+                              ),
+                            ],
+                            const SizedBox(height: 4),
+                            if (goal.difficulty != null)
+                              Row(
+                                children: [
                                   Chip(
                                     label: Text(goal.difficulty!.displayName),
                                     padding: EdgeInsets.zero,
@@ -530,8 +523,7 @@ class _GoalsScreenState extends State<GoalsScreen> {
                                         MaterialTapTargetSize.shrinkWrap,
                                   ),
                                 ],
-                              ],
-                            ),
+                              ),
                           ],
                         ),
                         trailing: PopupMenuButton(
@@ -557,7 +549,7 @@ class _GoalsScreenState extends State<GoalsScreen> {
                           ],
                         ),
                         onTap: () async {
-                          final result = await context.push('/goals/${goal.id}');
+                          final result = await context.push('/short-term-goals/${goal.id}');
                           if (result == true || mounted) {
                             _loadGoals(); // Reload to show updated status
                           }
@@ -572,3 +564,4 @@ class _GoalsScreenState extends State<GoalsScreen> {
     );
   }
 }
+

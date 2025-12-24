@@ -27,22 +27,26 @@ A Flutter-based skill tracking application that helps you organize and track you
 ### Installation
 
 1. Clone the repository:
+
 ```bash
 git clone <your-repo-url>
 cd Progress/progress
 ```
 
 2. Install dependencies:
+
 ```bash
 flutter pub get
 ```
 
 3. Run the app:
+
 ```bash
 flutter run -d chrome --web-port=5555
 ```
 
 Or use the provided script:
+
 ```bash
 ./run_web.sh
 ```
@@ -94,4 +98,3 @@ The app uses a hierarchical structure:
 ## License
 
 [Add your license here]
-

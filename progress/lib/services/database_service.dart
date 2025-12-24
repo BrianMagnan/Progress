@@ -340,7 +340,7 @@ class DatabaseService {
           continue;
         }
       }
-      skills.sort((a, b) => a.name.compareTo(b.name));
+      skills.sort((a, b) => a.order.compareTo(b.order));
       return skills;
     }
 
@@ -359,7 +359,7 @@ class DatabaseService {
       }
     }
 
-    skills.sort((a, b) => a.name.compareTo(b.name));
+    skills.sort((a, b) => a.order.compareTo(b.order));
     return skills;
   }
 

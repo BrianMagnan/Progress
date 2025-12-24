@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../models/category.dart';
-import '../services/database_service.dart';
+import '../services/supabase_database_service.dart';
+import 'global_search_screen.dart';
 import '../utils/helpers.dart';
-import 'skills_screen.dart';
+import '../widgets/breadcrumb_nav.dart';
 
 class CategoriesScreen extends StatefulWidget {
   const CategoriesScreen({super.key});
@@ -12,7 +14,7 @@ class CategoriesScreen extends StatefulWidget {
 }
 
 class _CategoriesScreenState extends State<CategoriesScreen> {
-  final DatabaseService _db = DatabaseService.instance;
+  final SupabaseDatabaseService _db = SupabaseDatabaseService.instance;
   List<Category> _categories = [];
   bool _isLoading = true;
 
@@ -45,12 +47,12 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
     final result = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('New Category'),
+        title: const Text('New Long Term Goal'),
         content: TextField(
           controller: controller,
           autofocus: true,
           decoration: const InputDecoration(
-            hintText: 'Category name',
+            hintText: 'Long term goal name',
             border: OutlineInputBorder(),
           ),
           onSubmitted: (value) {
@@ -98,7 +100,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Error saving category: $e'),
+              content: Text('Error saving long term goal: $e'),
               backgroundColor: Theme.of(context).colorScheme.error,
             ),
           );
@@ -130,11 +132,68 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
     }
   }
 
+  Future<void> _editCategory(Category category) async {
+    final controller = TextEditingController(text: category.name);
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Edit Long Term Goal'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(
+            hintText: 'Long term goal name',
+            border: OutlineInputBorder(),
+          ),
+          onSubmitted: (value) {
+            if (value.trim().isNotEmpty) {
+              Navigator.pop(context, value.trim());
+            }
+          },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              if (controller.text.trim().isNotEmpty) {
+                Navigator.pop(context, controller.text.trim());
+              }
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+
+    if (result != null && result.isNotEmpty) {
+      final now = DateTime.now();
+      final updatedCategory = category.copyWith(name: result, updatedAt: now);
+      try {
+        await _db.updateCategory(updatedCategory);
+        // Small delay to ensure IndexedDB write completes before reloading
+        await Future.delayed(const Duration(milliseconds: 100));
+        _loadCategories();
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error updating long term goal: $e'),
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
+          );
+        }
+      }
+    }
+  }
+
   Future<void> _deleteCategory(Category category) async {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Delete Category'),
+        title: const Text('Delete Long Term Goal'),
         content: Text(
           'Are you sure you want to delete "${category.name}"? This will also delete all associated skills, sub-skills, goals, and progress logs.',
         ),
@@ -160,38 +219,69 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
     }
   }
 
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Categories')),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _categories.isEmpty
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.folder_outlined,
-                    size: 64,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'No categories yet',
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Create your first category to get started',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
-            )
-          : ReorderableListView.builder(
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => context.go('/'),
+          tooltip: 'Back to home',
+        ),
+        title: const Text('Long Term Goals'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.search_rounded),
+            onPressed: () {
+              GlobalSearchScreen.show(context);
+            },
+            tooltip: 'Search all goals and tasks',
+          ),
+          IconButton(
+            icon: const Icon(Icons.add),
+            onPressed: _addCategory,
+            tooltip: 'Add long term goal',
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+          BreadcrumbNav(
+            items: const [
+              BreadcrumbItem(label: 'Home', route: '/'),
+              BreadcrumbItem(label: 'Long Term Goals'),
+            ],
+          ),
+          Expanded(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _categories.isEmpty
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.folder_outlined,
+                              size: 64,
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              'No long term goals yet',
+                              style: Theme.of(context).textTheme.titleLarge,
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Create your first long term goal to get started',
+                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                  ),
+                            ),
+                          ],
+                        ),
+                      )
+                    : ReorderableListView.builder(
               padding: const EdgeInsets.all(16),
               itemCount: _categories.length,
               onReorder: _onReorder,
@@ -214,32 +304,14 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                       horizontal: 16,
                       vertical: 8,
                     ),
-                    leading: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        ReorderableDragStartListener(
-                          index: index,
-                          child: Icon(
-                            Icons.drag_handle,
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.onSurfaceVariant,
-                            size: 24,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        CircleAvatar(
-                          backgroundColor: Theme.of(
-                            context,
-                          ).colorScheme.primaryContainer,
-                          child: Icon(
-                            Icons.folder,
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.onPrimaryContainer,
-                          ),
-                        ),
-                      ],
+                    leading: CircleAvatar(
+                      backgroundColor: Theme.of(
+                        context,
+                      ).colorScheme.primaryContainer,
+                      child: Icon(
+                        Icons.folder,
+                        color: Theme.of(context).colorScheme.onPrimaryContainer,
+                      ),
                     ),
                     title: Text(
                       category.name,
@@ -248,29 +320,32 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                     trailing: PopupMenuButton(
                       itemBuilder: (context) => [
                         PopupMenuItem(
+                          child: const Text('Edit'),
+                          onTap: () {
+                            Future.delayed(
+                              Duration.zero,
+                              () => _editCategory(category),
+                            );
+                          },
+                        ),
+                        PopupMenuItem(
                           child: const Text('Delete'),
                           onTap: () => _deleteCategory(category),
                         ),
                       ],
                     ),
                     onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) =>
-                              SkillsScreen(category: category),
-                        ),
-                      );
+                      context.push('/long-term-goals/${category.id}');
                     },
                   ),
                 );
               },
             ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _addCategory,
-        icon: const Icon(Icons.add),
-        label: const Text('New Category'),
+          ),
+        ],
       ),
     );
   }
 }
+
+
